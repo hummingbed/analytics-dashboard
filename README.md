@@ -13,7 +13,7 @@ The API returns `202 Accepted` when Kafka queues a transaction. The consumer sav
 
 The initial dashboard request uses SQL aggregation and returns only summary totals plus the latest 20 transactions. An indexed query keeps historical rows out of application memory.
 
-The Kafka offset is committed only after SQLite persistence and broadcasting succeed. Docker mounts the complete SQLite directory so its journal files are shared safely between the app and consumer containers.
+The Kafka offset is committed only after SQLite persistence and broadcasting succeed. Docker mounts the complete SQLite directory so its journal files are shared safely between the app and consumer containers. The migration enables WAL once; runtime connections only set a busy timeout and do not repeatedly change the journal mode.
 
 ## Requirements
 
