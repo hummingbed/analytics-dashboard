@@ -55,7 +55,11 @@ class TransactionDashboardTest extends TestCase
 
         $this->assertDatabaseCount('transactions', 1);
         $this->assertDatabaseHas('transactions', ['transaction_id' => $transaction['transaction_id']]);
-        Event::assertDispatchedTimes(TransactionCreated::class, 1);
+        Event::assertDispatchedTimes(TransactionCreated::class, 2);
+        Event::assertDispatched(
+            TransactionCreated::class,
+            fn (TransactionCreated $event) => $event->broadcastWith()['counts_toward_today'] === true,
+        );
     }
 
     public function test_dashboard_returns_transaction_summary_and_recent_rows(): void

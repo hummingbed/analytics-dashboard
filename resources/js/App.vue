@@ -10,7 +10,7 @@ const socketConnected = ref(false);
 
 const money = new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: 'USD',
+    currency: 'NGN',
     maximumFractionDigits: 0,
 });
 
@@ -32,6 +32,34 @@ async function loadDashboard() {
     }
 }
 
+function applyTransaction(event) {
+    if (!snapshot.value) {
+        loadDashboard();
+        return;
+    }
+
+    const transaction = event.transaction;
+    const alreadyDisplayed = snapshot.value.transactions.some(
+        item => item.transaction_id === transaction.transaction_id,
+    );
+
+    if (alreadyDisplayed) return;
+
+    if (event.counts_toward_today) {
+        const summary = snapshot.value.summary;
+        summary.total_value = Math.round((summary.total_value + Number(transaction.amount)) * 100) / 100;
+        summary.transaction_count += 1;
+
+        if (transaction.status === 'successful') summary.successful_count += 1;
+        if (transaction.status === 'failed') summary.failed_count += 1;
+    }
+
+    snapshot.value.transactions = [...snapshot.value.transactions, transaction]
+        .sort((left, right) => new Date(right.transacted_at) - new Date(left.transacted_at))
+        .slice(0, 20);
+    snapshot.value.updated_at = event.broadcasted_at;
+}
+
 onMounted(() => {
     loadDashboard();
 
@@ -41,7 +69,7 @@ onMounted(() => {
     Echo.connector.pusher.connection.bind('disconnected', () => {
         socketConnected.value = false;
     });
-    Echo.channel('transactions').listen('.transaction.created', loadDashboard);
+    Echo.channel('transactions').listen('.transaction.created', applyTransaction);
 });
 
 onBeforeUnmount(() => Echo.leaveChannel('transactions'));

@@ -1,7 +1,7 @@
 <script setup>
 defineProps({ transactions: { type: Array, required: true } });
 
-const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'NGN' });
 </script>
 
 <template>

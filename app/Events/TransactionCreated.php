@@ -24,4 +24,13 @@ class TransactionCreated implements ShouldBroadcastNow
     {
         return 'transaction.created';
     }
+
+    public function broadcastWith(): array
+    {
+        return [
+            'transaction' => $this->transaction->toArray(),
+            'counts_toward_today' => $this->transaction->transacted_at->isToday(),
+            'broadcasted_at' => now()->toIso8601String(),
+        ];
+    }
 }

@@ -6,6 +6,7 @@ use App\Events\TransactionCreated;
 use App\Models\Transaction;
 use Illuminate\Console\Command;
 use Junges\Kafka\Contracts\ConsumerMessage;
+use Junges\Kafka\Contracts\MessageConsumer;
 use Junges\Kafka\Facades\Kafka;
 
 class ConsumeTransactions extends Command
@@ -21,8 +22,8 @@ class ConsumeTransactions extends Command
         Kafka::consumer([config('analytics.kafka_topic')])
             ->withBrokers(config('analytics.kafka_brokers'))
             ->withConsumerGroupId(config('analytics.kafka_consumer_group'))
-            ->withAutoCommit()
-            ->withHandler(function (ConsumerMessage $message): void {
+            ->withManualCommit()
+            ->withHandler(function (ConsumerMessage $message, MessageConsumer $consumer): void {
                 $transaction = $message->getBody();
 
                 $savedTransaction = Transaction::firstOrCreate(
@@ -30,9 +31,8 @@ class ConsumeTransactions extends Command
                     $transaction,
                 );
 
-                if ($savedTransaction->wasRecentlyCreated) {
-                    TransactionCreated::dispatch($savedTransaction);
-                }
+                TransactionCreated::dispatch($savedTransaction);
+                $consumer->commit($message);
             })
             ->withOptions(['auto.offset.reset' => 'earliest'])
             ->build()

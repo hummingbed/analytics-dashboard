@@ -9,7 +9,11 @@ POST /api/transactions → Laravel → Kafka → Consumer ── saves ─→ SQ
                                               SQLite ← GET /api/dashboard
 ```
 
-The API returns `202 Accepted` when Kafka queues a transaction. The consumer saves it, broadcasts a `transaction.created` event, and Vue refreshes immediately.
+The API returns `202 Accepted` when Kafka queues a transaction. The consumer saves it and broadcasts a `transaction.created` event. Vue applies that transaction locally without repeatedly fetching the database.
+
+The initial dashboard request uses SQL aggregation and returns only summary totals plus the latest 20 transactions. An indexed query keeps historical rows out of application memory.
+
+The Kafka offset is committed only after SQLite persistence and broadcasting succeed. Docker mounts the complete SQLite directory so its journal files are shared safely between the app and consumer containers.
 
 ## Requirements
 
