@@ -1,57 +1,39 @@
 # Transact Dashboard
 
-A near-real-time user transaction dashboard built with Laravel 12, Vue 3, Apache Kafka, and SQLite. The API publishes transactions to Kafka, a Laravel consumer persists them, and Vue refreshes the dashboard every five seconds.
-
-## Data flow
+A near-real-time transaction dashboard built with Laravel 12, Vue 3, Kafka, and SQLite.
 
 ```text
-POST /api/transactions
-        |
-        v
-Laravel Kafka producer
-        |
-        v
-user-transactions topic
-        |
-        v
-Laravel consumer --> SQLite --> GET /api/dashboard --> Vue
+POST /api/transactions → Laravel → Kafka → Consumer → SQLite
+                                                    ↓
+Vue dashboard ← GET /api/dashboard ←───────────────┘
 ```
 
-The transaction endpoint returns `202 Accepted` after the message is queued. The consumer must be running before the transaction can appear on the dashboard.
+The API returns `202 Accepted` when Kafka queues a transaction. Vue refreshes the dashboard every five seconds.
 
 ## Requirements
 
-For the recommended Docker setup:
+Docker setup:
 
 - Docker Engine 24+
 - Docker Compose v2
-- 3 GB available memory
-- Ports `8000` and `29092` available
+- Ports `8000` and `29092`
 
-For a native setup:
+Native setup:
 
 - PHP 8.2+, Composer 2, and PHP SQLite
 - Node.js 20+ and npm
-- Apache Kafka and Java 17+
-- `librdkafka` and the PHP `rdkafka` extension
+- Kafka, Java 17+, `librdkafka`, and PHP `rdkafka`
 
-Check the required PHP extensions:
-
-```bash
-php -m | grep -E 'pdo_sqlite|rdkafka'
-```
-
-## Run with Docker
+## Docker setup
 
 ```bash
 cp .env.example .env
 touch database/database.sqlite
+php artisan key:generate
 docker compose up --build -d
 ```
 
-If `APP_KEY` is empty, generate one locally with `php artisan key:generate` before starting the containers. Open [http://localhost:8000](http://localhost:8000).
-
-Useful commands:
+Open [http://localhost:8000](http://localhost:8000).
 
 ```bash
 docker compose ps
@@ -59,17 +41,15 @@ docker compose logs -f consumer
 docker compose down
 ```
 
-Create a clean database with sample transactions:
+Reset the database and add sample transactions:
 
 ```bash
 docker compose exec app php artisan migrate:fresh --seed
 ```
 
-This command deletes all existing SQLite records.
+> `migrate:fresh` deletes existing database records.
 
-## Run without Docker
-
-Install PHP and frontend dependencies:
+## Native setup
 
 ```bash
 composer install
@@ -78,10 +58,9 @@ cp .env.example .env
 php artisan key:generate
 touch database/database.sqlite
 php artisan migrate
-npm run build
 ```
 
-For Kafka running on your machine, use:
+When Kafka runs locally, set:
 
 ```dotenv
 KAFKA_BROKERS=localhost:9092
@@ -89,19 +68,15 @@ KAFKA_TOPIC=user-transactions
 KAFKA_CONSUMER_GROUP=transaction-dashboard
 ```
 
-Create the topic:
+Create the Kafka topic:
 
 ```bash
-bin/kafka-topics.sh \
-  --bootstrap-server localhost:9092 \
-  --create \
-  --if-not-exists \
-  --topic user-transactions \
-  --partitions 3 \
+bin/kafka-topics.sh --bootstrap-server localhost:9092 --create \
+  --if-not-exists --topic user-transactions --partitions 3 \
   --replication-factor 1
 ```
 
-Run these processes in separate terminals:
+Run in separate terminals:
 
 ```bash
 php artisan serve
@@ -109,41 +84,14 @@ php artisan kafka:consume-transactions
 npm run dev
 ```
 
-## Transaction API
+## API
 
-```http
-POST /api/transactions
-Content-Type: application/json
-Accept: application/json
-```
-
-Request body:
-
-```json
-{
-  "transaction_id": "fc47e688-53ad-4db5-a0e2-23bb973fd640",
-  "user_name": "Michael",
-  "amount": 2500,
-  "type": "credit",
-  "status": "successful",
-  "description": "Wallet deposit",
-  "transacted_at": "2026-08-17T15:30:00+01:00"
-}
-```
-
-Allowed values:
-
-- `type`: `credit` or `debit`
-- `status`: `pending`, `successful`, or `failed`
-
-`description` is optional. All other fields are required, and each new transaction needs a unique UUID.
-
-Example request:
+Send a transaction:
 
 ```bash
 curl -X POST http://localhost:8000/api/transactions \
-  -H 'Content-Type: application/json' \
   -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
   -d '{
     "transaction_id":"fc47e688-53ad-4db5-a0e2-23bb973fd640",
     "user_name":"Michael",
@@ -155,21 +103,38 @@ curl -X POST http://localhost:8000/api/transactions \
   }'
 ```
 
-Response:
+- `type`: `credit` or `debit`
+- `status`: `pending`, `successful`, or `failed`
+- `description` is optional; all other fields are required.
+- Use a unique UUID for each transaction.
 
-```json
-{
-  "transaction_id": "fc47e688-53ad-4db5-a0e2-23bb973fd640",
-  "status": "queued",
-  "topic": "user-transactions"
-}
+Dashboard JSON is available at `GET /api/dashboard`.
+
+## Send 100 requests
+
+This Bash command requires `uuidgen`:
+
+```bash
+for i in $(seq 1 100); do
+  curl -sS -X POST http://localhost:8000/api/transactions \
+    -H 'Accept: application/json' \
+    -H 'Content-Type: application/json' \
+    -d "{
+      \"transaction_id\":\"$(uuidgen)\",
+      \"user_name\":\"User $i\",
+      \"amount\":$((RANDOM % 5000 + 1)),
+      \"type\":\"$([ $((i % 2)) -eq 0 ] && echo credit || echo debit)\",
+      \"status\":\"successful\",
+      \"description\":\"Load test transaction $i\",
+      \"transacted_at\":\"$(date --iso-8601=seconds)\"
+    }"
+  echo
+done
 ```
-
-Dashboard data is available from `GET /api/dashboard`.
 
 ## Database
 
-The SQLite file is `database/database.sqlite`. Inspect it with:
+The database is [database/database.sqlite](database/database.sqlite).
 
 ```bash
 sqlite3 database/database.sqlite
@@ -178,19 +143,10 @@ sqlite3 database/database.sqlite
 ```sql
 .tables
 .schema transactions
-SELECT transaction_id, user_name, amount, type, status, transacted_at
-FROM transactions
-ORDER BY transacted_at DESC
-LIMIT 20;
+SELECT * FROM transactions ORDER BY transacted_at DESC LIMIT 20;
 ```
 
-Or use Laravel Tinker:
-
-```bash
-php artisan tinker --execute="dump(App\Models\Transaction::latest('transacted_at')->take(20)->get()->toArray());"
-```
-
-## Tests and frontend
+## Verify
 
 ```bash
 php artisan test
@@ -198,15 +154,4 @@ vendor/bin/pint app config database routes tests
 npm run build
 ```
 
-The Vue frontend polls `GET /api/dashboard` every five seconds. For development hot reload, use `npm run dev`.
-
-## Troubleshooting
-
-If the API accepts a transaction but the dashboard does not update, verify the consumer:
-
-```bash
-docker compose ps
-docker compose logs --tail=100 consumer
-```
-
-Inside Docker, Kafka is `kafka:9092`. From the host, the Compose broker is `localhost:29092`. If PHP reports `Class "RdKafka\\Conf" not found`, install and enable the `rdkafka` extension.
+If accepted transactions do not appear, check the consumer with `docker compose logs --tail=100 consumer`.
