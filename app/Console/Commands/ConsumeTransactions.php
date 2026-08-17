@@ -2,31 +2,31 @@
 
 namespace App\Console\Commands;
 
-use App\Models\MetricEvent;
+use App\Models\Transaction;
 use Illuminate\Console\Command;
 use Junges\Kafka\Contracts\ConsumerMessage;
 use Junges\Kafka\Facades\Kafka;
 
-class ConsumeAnalyticsEvents extends Command
+class ConsumeTransactions extends Command
 {
-    protected $signature = 'kafka:consume-analytics';
+    protected $signature = 'kafka:consume-transactions';
 
-    protected $description = 'Consume analytics events from Kafka and persist them';
+    protected $description = 'Consume transactions from Kafka and persist them';
 
     public function handle(): int
     {
-        $this->components->info('Listening for analytics events...');
+        $this->components->info('Listening for transactions...');
 
         Kafka::consumer([config('analytics.kafka_topic')])
             ->withBrokers(config('analytics.kafka_brokers'))
             ->withConsumerGroupId(config('analytics.kafka_consumer_group'))
             ->withAutoCommit()
             ->withHandler(function (ConsumerMessage $message): void {
-                $event = $message->getBody();
+                $transaction = $message->getBody();
 
-                MetricEvent::firstOrCreate(
-                    ['event_id' => $event['event_id']],
-                    $event,
+                Transaction::firstOrCreate(
+                    ['transaction_id' => $transaction['transaction_id']],
+                    $transaction,
                 );
             })
             ->withOptions(['auto.offset.reset' => 'earliest'])

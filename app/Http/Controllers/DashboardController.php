@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\DashboardMetrics;
+use App\Services\TransactionDashboard;
 use Illuminate\Http\JsonResponse;
 use Illuminate\View\View;
 
@@ -13,8 +13,8 @@ class DashboardController extends Controller
         return view('dashboard');
     }
 
-    public function data(DashboardMetrics $metrics): JsonResponse
+    public function data(TransactionDashboard $dashboard): JsonResponse
     {
-        return response()->json(['data' => $metrics->snapshot()]);
+        return response()->json(['data' => $dashboard->snapshot()]);
     }
 }
