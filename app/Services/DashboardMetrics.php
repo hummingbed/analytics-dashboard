@@ -33,7 +33,6 @@ class DashboardMetrics
 
             return [
                 'label' => $start->setHour($hour)->format('H:00'),
-                'revenue' => round((float) $bucket->where('type', 'sale')->sum('value'), 2),
                 'traffic' => $bucket->where('type', 'page_view')->count(),
             ];
         });
