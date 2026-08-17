@@ -1,13 +1,16 @@
 # Pulse Analytics
 
-A Laravel 12 starter for near-real-time sales, traffic, click, financial, and operations analytics. Events enter through an idempotent JSON API and the dashboard refreshes every five seconds.
+A Laravel 12 and Apache Kafka application for near-real-time sales, traffic, click, financial, and operations analytics. The API publishes events to Kafka, a separate consumer persists them, and the dashboard refreshes every five seconds.
 
 ```bash
-php artisan migrate:fresh --seed
-php artisan serve
+docker compose up --build
 ```
 
-Ingest events with `POST /api/events`. Supported types are `sale`, `page_view`, `click`, `operation`, and `financial`. A Kafka consumer can reuse the same `MetricEvent` persistence contract.
+Open `http://localhost:8000`. Ingest events with `POST /api/events`; a successful publish returns HTTP 202. Supported types are `sale`, `page_view`, `click`, `operation`, and `financial`.
+
+The stack includes the Laravel web app, an Apache Kafka KRaft broker, topic initialization, and a long-running Laravel consumer. Kafka is exposed to host tools at `localhost:29092` and is available to containers at `kafka:9092`.
+
+The frontend uses Vue 3 components compiled by Vite during the Docker build. For local frontend development, run `npm run dev`; for a production bundle, run `npm run build`.
 
 <p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
 

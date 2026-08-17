@@ -8,9 +8,9 @@ use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
-    public function index(DashboardMetrics $metrics): View
+    public function index(): View
     {
-        return view('dashboard', ['snapshot' => $metrics->snapshot()]);
+        return view('dashboard');
     }
 
     public function data(DashboardMetrics $metrics): JsonResponse
