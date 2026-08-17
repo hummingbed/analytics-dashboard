@@ -463,17 +463,3 @@ docker compose up --build -d
 ```
 
 This recreates Kafka with an empty log. It does not remove the bind-mounted SQLite file.
-
-## Production notes
-
-The included Compose configuration is intended for local development and demonstrations. Before production use:
-
-- Replace SQLite with PostgreSQL or MySQL for concurrent workloads.
-- Use a managed or multi-broker Kafka cluster with authentication and TLS.
-- Protect `POST /api/events` with authentication and rate limiting.
-- Run the consumer with restart monitoring.
-- Serve Laravel behind Nginx or Caddy with HTTPS.
-- Configure database backups and centralized logs.
-- Set `APP_ENV=production`, `APP_DEBUG=false`, and a strong `APP_KEY`.
-
-Free Render web services are not suitable for this complete stack because Kafka and the consumer must remain running and SQLite needs persistent storage. A VM capable of running Docker Compose is the simplest deployment target for the current architecture.
