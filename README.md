@@ -13,7 +13,7 @@ The API returns `202 Accepted` when Kafka queues a transaction. The consumer sav
 
 The initial dashboard request uses SQL aggregation and returns only summary totals plus the latest 20 transactions. An indexed query keeps historical rows out of application memory.
 
-The Kafka offset is committed only after SQLite persistence and broadcasting succeed. Docker mounts the complete SQLite directory so its journal files are shared safely between the app and consumer containers. The migration enables WAL once; runtime connections only set a busy timeout and do not repeatedly change the journal mode.
+The Kafka offset is committed only after SQLite persistence and broadcasting succeed. Docker keeps SQLite in a named volume so locking and journal files remain on Docker's Linux filesystem and are shared safely between the app and consumer containers. The migration enables WAL once; runtime connections only set a busy timeout and do not repeatedly change the journal mode.
 
 ## Requirements
 
@@ -33,7 +33,6 @@ Native setup:
 
 ```bash
 cp .env.example .env
-touch database/database.sqlite
 php artisan key:generate
 docker compose up --build -d
 ```
@@ -50,10 +49,12 @@ docker compose down
 Reset the database and add sample transactions:
 
 ```bash
-docker compose exec app php artisan migrate:fresh --seed
+docker compose stop app consumer
+docker compose run --rm --no-deps app php artisan migrate:fresh --seed
+docker compose up -d app consumer
 ```
 
-> `migrate:fresh` deletes existing database records.
+> `migrate:fresh` deletes all existing database records. Run Docker database commands through Compose; a host-level `php artisan migrate:fresh` operates on the separate native database file.
 
 ## Native setup
 
@@ -162,7 +163,16 @@ done
 
 ## Database
 
-The database is [database/database.sqlite](database/database.sqlite).
+Docker stores SQLite in the `sqlite-data` named volume. Keeping the database, WAL, and shared-memory files on Docker's Linux filesystem prevents cross-container locking and corruption caused by host bind mounts.
+
+Check the Docker database from either database client container:
+
+```bash
+docker compose exec app php artisan tinker --execute="dump(DB::select('PRAGMA integrity_check'));"
+docker compose exec consumer php artisan tinker --execute="dump(DB::table('transactions')->count());"
+```
+
+The native setup instead uses [database/database.sqlite](database/database.sqlite), which can be inspected directly:
 
 ```bash
 sqlite3 database/database.sqlite
@@ -173,6 +183,8 @@ sqlite3 database/database.sqlite
 .schema transactions
 SELECT * FROM transactions ORDER BY transacted_at DESC LIMIT 20;
 ```
+
+The Docker and native databases are intentionally separate. Do not mount `database/database.sqlite` or the host `database` directory into multiple containers; SQLite journal and lock files must remain on the same Docker-managed filesystem.
 
 ## Verify
 

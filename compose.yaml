@@ -36,7 +36,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./database:/var/www/html/database
+      - sqlite-data:/var/www/html/database
     environment:
       KAFKA_BROKERS: kafka:9092
       BROADCAST_CONNECTION: reverb
@@ -61,7 +61,7 @@ services:
     env_file: .env
     restart: unless-stopped
     volumes:
-      - ./database:/var/www/html/database
+      - sqlite-data:/var/www/html/database
     environment:
       KAFKA_BROKERS: kafka:9092
       BROADCAST_CONNECTION: reverb
@@ -95,3 +95,6 @@ services:
       REVERB_PORT: 8080
       REVERB_SCHEME: http
     command: php artisan reverb:start --host=0.0.0.0 --port=8080
+
+volumes:
+  sqlite-data:
