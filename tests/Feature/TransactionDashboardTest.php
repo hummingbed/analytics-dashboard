@@ -2,8 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Events\TransactionCreated;
 use App\Models\Transaction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 use Junges\Kafka\Contracts\ProducerMessage;
 use Junges\Kafka\Facades\Kafka;
@@ -43,6 +45,7 @@ class TransactionDashboardTest extends TestCase
 
     public function test_consumer_persists_each_transaction_only_once(): void
     {
+        Event::fake([TransactionCreated::class]);
         Kafka::fake();
         $transaction = $this->transactionPayload();
         $message = new ConsumedMessage('user-transactions', 0, [], $transaction, $transaction['transaction_id'], 1, now()->timestamp);
@@ -52,6 +55,7 @@ class TransactionDashboardTest extends TestCase
 
         $this->assertDatabaseCount('transactions', 1);
         $this->assertDatabaseHas('transactions', ['transaction_id' => $transaction['transaction_id']]);
+        Event::assertDispatchedTimes(TransactionCreated::class, 1);
     }
 
     public function test_dashboard_returns_transaction_summary_and_recent_rows(): void

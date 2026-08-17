@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Events\TransactionCreated;
 use App\Models\Transaction;
 use Illuminate\Console\Command;
 use Junges\Kafka\Contracts\ConsumerMessage;
@@ -24,10 +25,14 @@ class ConsumeTransactions extends Command
             ->withHandler(function (ConsumerMessage $message): void {
                 $transaction = $message->getBody();
 
-                Transaction::firstOrCreate(
+                $savedTransaction = Transaction::firstOrCreate(
                     ['transaction_id' => $transaction['transaction_id']],
                     $transaction,
                 );
+
+                if ($savedTransaction->wasRecentlyCreated) {
+                    TransactionCreated::dispatch($savedTransaction);
+                }
             })
             ->withOptions(['auto.offset.reset' => 'earliest'])
             ->build()

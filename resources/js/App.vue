@@ -1,11 +1,12 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import Echo from './echo';
 import SummaryCard from './components/SummaryCard.vue';
 import TransactionTable from './components/TransactionTable.vue';
 
 const snapshot = ref(null);
 const error = ref('');
-let timer;
+const socketConnected = ref(false);
 
 const money = new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -33,20 +34,28 @@ async function loadDashboard() {
 
 onMounted(() => {
     loadDashboard();
-    timer = window.setInterval(loadDashboard, 5000);
+
+    Echo.connector.pusher.connection.bind('connected', () => {
+        socketConnected.value = true;
+    });
+    Echo.connector.pusher.connection.bind('disconnected', () => {
+        socketConnected.value = false;
+    });
+    Echo.channel('transactions').listen('.transaction.created', loadDashboard);
 });
 
-onBeforeUnmount(() => window.clearInterval(timer));
+onBeforeUnmount(() => Echo.leaveChannel('transactions'));
 </script>
 
 <template>
     <main class="shell">
         <header>
             <div class="brand"><span class="logo">T</span>Transact</div>
-            <div class="connection" :class="{ offline: error }">
+            <div class="connection" :class="{ offline: error || !socketConnected }">
                 <span class="dot"></span>
                 <span v-if="error">Reconnecting…</span>
-                <span v-else-if="snapshot">Updated {{ new Date(snapshot.updated_at).toLocaleTimeString() }}</span>
+                <span v-else-if="!socketConnected">Connecting live updates…</span>
+                <span v-else-if="snapshot">Live · Updated {{ new Date(snapshot.updated_at).toLocaleTimeString() }}</span>
                 <span v-else>Connecting…</span>
             </div>
         </header>

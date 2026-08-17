@@ -1,14 +1,15 @@
 # Transact Dashboard
 
-A near-real-time transaction dashboard built with Laravel 12, Vue 3, Kafka, and SQLite.
+A real-time transaction dashboard built with Laravel 12, Vue 3, Kafka, Reverb, and SQLite.
 
 ```text
-POST /api/transactions → Laravel → Kafka → Consumer → SQLite
-                                                    ↓
-Vue dashboard ← GET /api/dashboard ←───────────────┘
+POST /api/transactions → Laravel → Kafka → Consumer ── saves ─→ SQLite
+                                             └─ broadcasts ─→ Reverb → Vue
+                                                                     ↓
+                                              SQLite ← GET /api/dashboard
 ```
 
-The API returns `202 Accepted` when Kafka queues a transaction. Vue refreshes the dashboard every five seconds.
+The API returns `202 Accepted` when Kafka queues a transaction. The consumer saves it, broadcasts a `transaction.created` event, and Vue refreshes immediately.
 
 ## Requirements
 
@@ -16,11 +17,11 @@ Docker setup:
 
 - Docker Engine 24+
 - Docker Compose v2
-- Ports `8000` and `29092`
+- Ports `8000`, `8080`, and `29092`
 
 Native setup:
 
-- PHP 8.2+, Composer 2, and PHP SQLite
+- PHP 8.2+, Composer 2, PHP SQLite, and PHP `pcntl`
 - Node.js 20+ and npm
 - Kafka, Java 17+, `librdkafka`, and PHP `rdkafka`
 
@@ -38,6 +39,7 @@ Open [http://localhost:8000](http://localhost:8000).
 ```bash
 docker compose ps
 docker compose logs -f consumer
+docker compose logs -f reverb
 docker compose down
 ```
 
@@ -66,6 +68,17 @@ When Kafka runs locally, set:
 KAFKA_BROKERS=localhost:9092
 KAFKA_TOPIC=user-transactions
 KAFKA_CONSUMER_GROUP=transaction-dashboard
+BROADCAST_CONNECTION=reverb
+REVERB_APP_ID=transactions-app
+REVERB_APP_KEY=transactions-key
+REVERB_APP_SECRET=transactions-secret
+REVERB_HOST=localhost
+REVERB_PORT=8080
+REVERB_SCHEME=http
+VITE_REVERB_APP_KEY="${REVERB_APP_KEY}"
+VITE_REVERB_HOST="${REVERB_HOST}"
+VITE_REVERB_PORT="${REVERB_PORT}"
+VITE_REVERB_SCHEME="${REVERB_SCHEME}"
 ```
 
 Create the Kafka topic:
@@ -81,6 +94,7 @@ Run in separate terminals:
 ```bash
 php artisan serve
 php artisan kafka:consume-transactions
+php artisan reverb:start
 npm run dev
 ```
 
@@ -109,6 +123,16 @@ curl -X POST http://localhost:8000/api/transactions \
 - Use a unique UUID for each transaction.
 
 Dashboard JSON is available at `GET /api/dashboard`.
+
+Successful response:
+
+```json
+{
+  "transaction_id": "fc47e688-53ad-4db5-a0e2-23bb973fd640",
+  "status": "queued",
+  "topic": "user-transactions"
+}
+```
 
 ## Send 100 requests
 
@@ -154,4 +178,13 @@ vendor/bin/pint app config database routes tests
 npm run build
 ```
 
-If accepted transactions do not appear, check the consumer with `docker compose logs --tail=100 consumer`.
+## Troubleshooting
+
+If accepted transactions do not appear:
+
+```bash
+docker compose ps
+docker compose logs --tail=100 consumer reverb
+```
+
+The consumer must be running to persist Kafka messages, and Reverb must be reachable on port `8080` for live browser updates.

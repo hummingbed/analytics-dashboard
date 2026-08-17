@@ -15,10 +15,12 @@ RUN apt-get update \
     && docker-php-ext-enable rdkafka \
     && rm -rf /var/lib/apt/lists/*
 
+RUN docker-php-ext-install pcntl
+
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 WORKDIR /var/www/html
 COPY . .
 RUN composer install --no-interaction --prefer-dist --optimize-autoloader
 COPY --from=frontend /app/public/build ./public/build
 
-EXPOSE 8000
+EXPOSE 8000 8080
