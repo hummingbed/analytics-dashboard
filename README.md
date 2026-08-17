@@ -26,7 +26,7 @@ The API returns `202 Accepted` when Kafka accepts a message. The event will appe
 ## Features
 
 - Kafka-based event ingestion with an idempotent event UUID
-- Separate producer and long-running consumer processes
+- A straightforward consumer command that persists messages directly
 - Sales, traffic, click, financial, and operations metrics
 - Vue 3 component-based dashboard with loading and reconnect states
 - Five-second dashboard refresh

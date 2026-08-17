@@ -2,8 +2,9 @@
 
 namespace App\Console\Commands;
 
-use App\Kafka\Handlers\AnalyticsEventHandler;
+use App\Models\MetricEvent;
 use Illuminate\Console\Command;
+use Junges\Kafka\Contracts\ConsumerMessage;
 use Junges\Kafka\Facades\Kafka;
 
 class ConsumeAnalyticsEvents extends Command
@@ -12,7 +13,7 @@ class ConsumeAnalyticsEvents extends Command
 
     protected $description = 'Consume analytics events from Kafka and persist them';
 
-    public function handle(AnalyticsEventHandler $handler): int
+    public function handle(): int
     {
         $this->components->info('Listening for analytics events...');
 
@@ -20,7 +21,14 @@ class ConsumeAnalyticsEvents extends Command
             ->withBrokers(config('analytics.kafka_brokers'))
             ->withConsumerGroupId(config('analytics.kafka_consumer_group'))
             ->withAutoCommit()
-            ->withHandler($handler)
+            ->withHandler(function (ConsumerMessage $message): void {
+                $event = $message->getBody();
+
+                MetricEvent::firstOrCreate(
+                    ['event_id' => $event['event_id']],
+                    $event,
+                );
+            })
             ->withOptions(['auto.offset.reset' => 'earliest'])
             ->build()
             ->consume();
